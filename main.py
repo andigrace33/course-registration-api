@@ -5,14 +5,11 @@ app = FastAPI()
 
 courses = {}
 
-
 def normalize(code: str) -> str:
     return code.replace(" ", "").strip()
 
-
 @app.post("/api/v1/admin/catalog/import")
 async def import_catalog(file: UploadFile = File(...)):
-
     content = await file.read()
     soup = BeautifulSoup(content, "html.parser")
 
@@ -57,11 +54,9 @@ async def import_catalog(file: UploadFile = File(...)):
 
 @app.get("/api/v1/catalog/courses/{course_code}")
 def get_course(course_code: str):
-
     key = normalize(course_code)
 
     if key not in courses:
         raise HTTPException(status_code=404, detail="Course not found")
 
     return courses[key]
-
