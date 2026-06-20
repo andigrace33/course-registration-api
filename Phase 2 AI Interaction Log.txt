@@ -1,0 +1,13 @@
+# AI Interaction Log: I used ChatGPT to write the code in Python. I do not know Python yet but I know a little bit of java and c++. 
+# I wanted to use python for the project so that I can become more familiar with it. I told ChatGPT what the requirements were for
+# ...phase 2. I am not familiar with FastAPI so I asked ChatGPT to create the endpoints that are required for history (post,put,delete)
+#..., plan (post,put,delete) and profile endpoint (get). I went to the example at "student-example.html". I inspected the website in
+#... Microsoft Edge to get the original html. I put the html in a vscode .html file. I gave the html file to ChatGPT so that it could
+#... use it for testing. I used ChatGPT to learn more about what BeautifulSoup is and I now understand it is library that converts html
+#...to a cleaner format in a tree-like structure for python to parse. ChatGPT walked me through the steps of how to actually submit the
+#... code by opening the project folder using command prompt, using "python -m uvicorn main:app --reload" to get uvicorn to start a
+#... web server, open a second command prompt window to test my API using a test "student 111"
+#ChatGPT gave me this link to test the import endpoint: curl -F "file=@student-example.html" http://127.0.0.1:8000/api/v1/students/111/history/import
+#ChatGPT gave me this to test if I could receive student 111's info including history, plan, course info including attempted and 
+# ...zero credit: curl http://127.0.0.1:8000/api/v1/students/111/profile
+#ChatGPT gave me this to test the plan endpoint: curl -X POST http://127.0.0.1:8000/api/v1/students/111/plan -H "Content-Type: application/json" -d "{\"planned_courses\":[{\"course_code\":\"COSC-3506\",\"term\":\"26F\"}]}"
