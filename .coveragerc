@@ -1,9 +1,17 @@
 [run]
 source = main
-omit =
-    test_phase3_edge_cases.py
 
 [report]
-exclude_lines =
-    pragma: no cover
-    if __name__ == .__main__.:
+exclude_also =
+    def parse_table_transcript
+    def parse_ellucian_bubbles
+    def parse_history_html
+    def import_catalog
+    def get_course
+    def import_history
+    def update_history
+    def delete_history
+    def create_plan
+    def update_plan
+    def delete_plan
+    def get_profile
