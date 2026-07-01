@@ -1,0 +1,9 @@
+[run]
+source = main
+omit =
+    test_phase3_edge_cases.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
