@@ -1,17 +1,9 @@
-# AI Interaction Log: I used ChatGPT to write the code in Python. I do not know Python yet but I know a little bit of java and c++. 
-# I wanted to use python for the project so that I can become more familiar with it. I told ChatGPT what the requirements were for
-# ...phase 2. I am not familiar with FastAPI so I asked ChatGPT to create the endpoints that are required for history (post,put,delete)
-#..., plan (post,put,delete) and profile endpoint (get). I went to the example at "student-example.html". I inspected the website in
-#... Microsoft Edge to get the original html. I put the html in a vscode .html file. I gave the html file to ChatGPT so that it could
-#... use it for testing. I used ChatGPT to learn more about what BeautifulSoup is and I now understand it is library that converts html
-#...to a cleaner format in a tree-like structure for python to parse. ChatGPT walked me through the steps of how to actually submit the
-#... code by opening the project folder using command prompt, using "python -m uvicorn main:app --reload" to get uvicorn to start a
-#... web server, open a second command prompt window to test my API using a test "student 111"
-#ChatGPT gave me this link to test the import endpoint: curl -F "file=@student-example.html" http://127.0.0.1:8000/api/v1/students/111/history/import
-#ChatGPT gave me this to test if I could receive student 111's info including history, plan, course info including attempted and 
-# ...zero credit: curl http://127.0.0.1:8000/api/v1/students/111/profile
-#ChatGPT gave me this to test the plan endpoint: curl -X POST http://127.0.0.1:8000/api/v1/students/111/plan -H "Content-Type: application/json" -d "{\"planned_courses\":[{\"course_code\":\"COSC-3506\",\"term\":\"26F\"}]}"
-
+# AI Interaction Log: Since phase 1, I have learned a little bit of python so I asked ChatGPT to walk me through
+# step by step how to turn the phase 2 code into the phase 3 requirements. I learned about python
+# dictionaries, how to make comments with #, remove spaces and hyphens and make uppercase,
+# I learned about python lists. I relied on ChatGPT to cover the edge cases involving prerequisites, 
+# courses taken multiple times etc. ChatGPT also showed me how to execute commands in the Terminal,
+# and also how to use uvicorn
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from pydantic import BaseModel
@@ -20,8 +12,16 @@ import re
 
 app = FastAPI()
 
+courses = {}
 students = {}
 
+#term and year dictionary
+season_order = {
+    "W": 1,
+    "SP": 2,
+    "S": 3,
+    "F": 4
+}
 
 class HistoryItem(BaseModel):
     course_code: str
@@ -42,6 +42,44 @@ class PlannedCourse(BaseModel):
 class PlanBody(BaseModel):
     planned_courses: list[PlannedCourse]
 
+#function to separate year and season
+def yearSeasonSeparator(yearSeason):
+    year = yearSeason[0:2]
+    season = yearSeason[2:4]
+
+    if not(year.isdigit()):
+        print("invalid year")
+    
+    if not(season.isalpha()):
+        print("invalid season")
+
+    return (year, season)
+
+#function to determine the earlier term of 2 terms
+def isTermEarlier(yearSeason1, yearSeason2):
+
+    year1, season1 = yearSeasonSeparator(yearSeason1)
+    year2, season2 = yearSeasonSeparator(yearSeason2)
+
+    if season1 in season_order: 
+        season1Code = season_order.get(season1)
+    if season2 in season_order: 
+        season2Code = season_order.get(season2)
+    
+    term1 = (int(year1),season1Code)
+    term2 = (int(year2), season2Code)
+
+    if term1 > term2:
+        return False
+    if term1 < term2:
+        return True
+    else:
+        return False
+
+
+#remove spaces and hyphens, make uppercase
+def normalize(code: str) -> str:
+    return code.replace("-","").upper().strip().replace(" ","")
 
 def credit_int(text: str) -> int:
     match = re.search(r"\d+", text or "")
@@ -148,7 +186,6 @@ def parse_table_transcript(soup):
 
     return records
 
-
 def parse_ellucian_bubbles(soup):
     records = []
 
@@ -183,7 +220,6 @@ def parse_ellucian_bubbles(soup):
 
     return records
 
-
 def parse_history_html(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
 
@@ -194,11 +230,207 @@ def parse_history_html(html_content):
 
     return deduplicate(records)
 
-
 def require_student(student_id: str):
     if student_id not in students:
         raise HTTPException(status_code=404, detail="Student not found")
 
+def term_value(term: str):
+    term = term.upper().strip()
+    year = int(term[0:2])
+    season = term[2:]
+    return (year, season_order[season])
+
+def term_before(term1: str, term2: str):
+    return term_value(term1) < term_value(term2)
+
+def split_course_list(text: str):
+    if not text:
+        return []
+
+    result = []
+
+    for item in text.split(","):
+        item = item.strip()
+
+        if item:
+            result.append(item)
+
+    return result
+
+#check prerequisites
+def check_prerequisites(student_id: str):
+    history = students[student_id]["history"]
+    plan = students[student_id]["plan"]
+
+    term_errors = {}
+
+    for planned_course in plan:
+        planned_code = planned_course["course_code"]
+        planned_term = planned_course["term"]
+
+        catalog_key = normalize(planned_code)
+
+        if catalog_key not in courses:
+            continue
+
+        catalog_course = courses[catalog_key]
+        prerequisites = split_course_list(catalog_course["prerequisites"])
+
+        for prerequisite in prerequisites:
+            found = False
+
+            for history_course in history:
+                same_course = normalize(history_course["course_code"]) == normalize(prerequisite)
+                completed = history_course["status"] == "Completed"
+                earlier = term_before(history_course["term"], planned_term)
+
+                if same_course and completed and earlier:
+                    found = True
+                    break
+
+            if not found:
+                if planned_term not in term_errors:
+                    term_errors[planned_term] = []
+
+                term_errors[planned_term].append({
+                    "course_code": planned_code,
+                    "type": "MISSING_PREREQUISITE",
+                    "message": "Missing prerequisite: " + prerequisite
+                })
+
+    timeline_validation = []
+
+    for term in sorted(term_errors.keys(), key=term_value):
+        timeline_validation.append({
+            "term": term,
+            "errors": term_errors[term]
+        })
+
+    return timeline_validation
+
+#cross list checker
+def check_cross_lists(student_id: str):
+    history = students[student_id]["history"]
+    plan = students[student_id]["plan"]
+
+    completed_codes = []
+
+    for history_course in history:
+        if history_course["status"] == "Completed":
+            completed_codes.append(normalize(history_course["course_code"]))
+
+    violations = []
+
+    for planned_course in plan:
+        planned_code = planned_course["course_code"]
+        catalog_key = normalize(planned_code)
+
+        if catalog_key not in courses:
+            continue
+
+        catalog_course = courses[catalog_key]
+        cross_listed_courses = split_course_list(catalog_course["cross_listed"])
+
+        for cross_listed in cross_listed_courses:
+            if normalize(cross_listed) in completed_codes:
+                violations.append({
+                    "course_code": planned_code,
+                    "type": "CROSS_LIST_CONFLICT",
+                    "message": "Cross-listed with completed course " + cross_listed
+                })
+
+    return violations
+
+#credit summary
+
+def get_credit_summary(student_id: str):
+    history = students[student_id]["history"]
+    plan = students[student_id]["plan"]
+
+    completed_courses = {}
+    total_planned = 0
+
+    for history_course in history:
+        key = normalize(history_course["course_code"])
+
+        if history_course["status"] == "Completed":
+            completed_courses[key] = history_course["credits_earned"]
+
+    total_earned = sum(completed_courses.values())
+
+    for planned_course in plan:
+        key = normalize(planned_course["course_code"])
+
+        if key in courses:
+            total_planned += courses[key]["credits"]
+
+    total_remaining = max(0, 120 - total_earned - total_planned)
+
+    return {
+        "total_earned": total_earned,
+        "total_planned": total_planned,
+        "total_remaining_for_graduation": total_remaining
+    }
+
+    
+#phase 1 API
+
+@app.post("/api/v1/admin/catalog/import")
+async def import_catalog(file: UploadFile = File(...)):
+
+    content = await file.read()
+    soup = BeautifulSoup(content, "html.parser")
+
+    table = soup.find("table")
+    if not table:
+        return {"message": "No table found"}
+
+    rows = table.find("tbody").find_all("tr")
+
+    count = 0
+
+    for row in rows:
+        cols = row.find_all("td")
+        if len(cols) < 5:
+            continue
+
+        course_code = cols[0].get_text(strip=True)
+        title = cols[1].get_text(strip=True)
+        credits_text = cols[2].get_text(strip=True)
+        prerequisites = cols[3].get_text(strip=True)
+        cross_listed = cols[4].get_text(strip=True)
+
+        credits = int(credits_text) if credits_text.isdigit() else 0
+
+        key = normalize(course_code)
+
+        courses[key] = {
+            "course_code": course_code,
+            "title": title,
+            "credits": credits,
+            "prerequisites": prerequisites,
+            "cross_listed": cross_listed
+        }
+
+        count += 1
+
+    return {
+        "message": "Catalog imported",
+        "courses_loaded": count
+    }
+
+
+@app.get("/api/v1/catalog/courses/{course_code}")
+def get_course(course_code: str):
+
+    key = normalize(course_code)
+
+    if key not in courses:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    return courses[key]
+
+#phase 2 API
 
 @app.post("/api/v1/students/{student_id}/history/import", status_code=status.HTTP_201_CREATED)
 async def import_history(student_id: str, file: UploadFile = File(...)):
@@ -284,4 +516,29 @@ def get_profile(student_id: str):
         "student_id": student_id,
         "history": students[student_id]["history"],
         "plan": students[student_id]["plan"]
+    }
+
+@app.get("/api/v1/students/{student_id}/audit-report")
+def audit_report(student_id: str, strict: bool = False):
+    require_student(student_id)
+
+    timeline_validation = check_prerequisites(student_id)
+    cross_list_violations = check_cross_lists(student_id)
+    credit_summary = get_credit_summary(student_id)
+
+    has_issues = bool(timeline_validation) or bool(cross_list_violations)
+
+    if has_issues and strict:
+        report_status = "failed"
+    elif has_issues:
+        report_status = "warning"
+    else:
+        report_status = "ok"
+
+    return {
+        "student_id": student_id,
+        "status": report_status,
+        "timeline_validation": timeline_validation,
+        "cross_list_violations": cross_list_violations,
+        "credit_summary": credit_summary
     }
