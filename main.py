@@ -3,7 +3,7 @@
 # dictionaries, how to make comments with #, remove spaces and hyphens and make uppercase,
 # I learned about python lists. I relied on ChatGPT to cover the edge cases involving prerequisites, 
 # courses taken multiple times etc. ChatGPT also showed me how to execute commands in the Terminal,
-# and also how to use uvicorn
+# and also how to use uvicorn, and how to complete the github actions checks portion as I have not done this before
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from pydantic import BaseModel
