@@ -42,11 +42,14 @@ def test_clean_audit_status_ok():
     add_course("COSC-1047")
     add_student(
         history=[
-            {"course_code": "COSC-1047", "term": "23F", "credits_earned": 3, "status": "Completed"}
+            {
+                "course_code": "COSC-1047",
+                "term": "23F",
+                "credits_earned": 3,
+                "status": "Completed",
+            }
         ],
-        plan=[
-            {"course_code": "COSC-2006", "term": "24W"}
-        ],
+        plan=[{"course_code": "COSC-2006", "term": "24W"}],
     )
 
     report = get_report()
@@ -65,9 +68,7 @@ def test_missing_prerequisite_warning_and_strict_failed():
     add_course("COSC-1047")
     add_student(
         history=[],
-        plan=[
-            {"course_code": "COSC-2006", "term": "24W"}
-        ],
+        plan=[{"course_code": "COSC-2006", "term": "24W"}],
     )
 
     report = get_report()
@@ -76,7 +77,9 @@ def test_missing_prerequisite_warning_and_strict_failed():
     assert report["status"] == "warning"
     assert strict_report["status"] == "failed"
     assert report["timeline_validation"][0]["term"] == "24W"
-    assert report["timeline_validation"][0]["errors"][0]["type"] == "MISSING_PREREQUISITE"
+    assert (
+        report["timeline_validation"][0]["errors"][0]["type"] == "MISSING_PREREQUISITE"
+    )
     assert report["timeline_validation"][0]["errors"][0]["course_code"] == "COSC-2006"
 
 
@@ -86,17 +89,22 @@ def test_same_term_prerequisite_does_not_count():
     add_course("COSC-1047")
     add_student(
         history=[
-            {"course_code": "COSC-1047", "term": "24W", "credits_earned": 3, "status": "Completed"}
+            {
+                "course_code": "COSC-1047",
+                "term": "24W",
+                "credits_earned": 3,
+                "status": "Completed",
+            }
         ],
-        plan=[
-            {"course_code": "COSC-2006", "term": "24W"}
-        ],
+        plan=[{"course_code": "COSC-2006", "term": "24W"}],
     )
 
     report = get_report()
 
     assert report["status"] == "warning"
-    assert report["timeline_validation"][0]["errors"][0]["type"] == "MISSING_PREREQUISITE"
+    assert (
+        report["timeline_validation"][0]["errors"][0]["type"] == "MISSING_PREREQUISITE"
+    )
 
 
 def test_later_term_prerequisite_does_not_count():
@@ -105,17 +113,22 @@ def test_later_term_prerequisite_does_not_count():
     add_course("COSC-1047")
     add_student(
         history=[
-            {"course_code": "COSC-1047", "term": "24F", "credits_earned": 3, "status": "Completed"}
+            {
+                "course_code": "COSC-1047",
+                "term": "24F",
+                "credits_earned": 3,
+                "status": "Completed",
+            }
         ],
-        plan=[
-            {"course_code": "COSC-2006", "term": "24W"}
-        ],
+        plan=[{"course_code": "COSC-2006", "term": "24W"}],
     )
 
     report = get_report()
 
     assert report["status"] == "warning"
-    assert report["timeline_validation"][0]["errors"][0]["type"] == "MISSING_PREREQUISITE"
+    assert (
+        report["timeline_validation"][0]["errors"][0]["type"] == "MISSING_PREREQUISITE"
+    )
 
 
 def test_course_code_matching_ignores_case_spaces_and_hyphens():
@@ -124,11 +137,14 @@ def test_course_code_matching_ignores_case_spaces_and_hyphens():
     add_course("COSC-1047")
     add_student(
         history=[
-            {"course_code": "cosc 1047", "term": "23F", "credits_earned": 3, "status": "Completed"}
+            {
+                "course_code": "cosc 1047",
+                "term": "23F",
+                "credits_earned": 3,
+                "status": "Completed",
+            }
         ],
-        plan=[
-            {"course_code": "COSC2006", "term": "24W"}
-        ],
+        plan=[{"course_code": "COSC2006", "term": "24W"}],
     )
 
     report = get_report()
@@ -144,11 +160,14 @@ def test_multiple_prerequisites_one_missing():
     add_course("COSC-3127")
     add_student(
         history=[
-            {"course_code": "COSC-2006", "term": "23F", "credits_earned": 3, "status": "Completed"}
+            {
+                "course_code": "COSC-2006",
+                "term": "23F",
+                "credits_earned": 3,
+                "status": "Completed",
+            }
         ],
-        plan=[
-            {"course_code": "COSC-3506", "term": "24F"}
-        ],
+        plan=[{"course_code": "COSC-3506", "term": "24F"}],
     )
 
     report = get_report()
@@ -182,11 +201,14 @@ def test_cross_list_conflict_with_completed_course():
     add_course("COSC-3506")
     add_student(
         history=[
-            {"course_code": "COSC-3506", "term": "24W", "credits_earned": 3, "status": "Completed"}
+            {
+                "course_code": "COSC-3506",
+                "term": "24W",
+                "credits_earned": 3,
+                "status": "Completed",
+            }
         ],
-        plan=[
-            {"course_code": "ITEC-3506", "term": "24F"}
-        ],
+        plan=[{"course_code": "ITEC-3506", "term": "24F"}],
     )
 
     report = get_report()
@@ -203,11 +225,14 @@ def test_cross_list_does_not_trigger_for_attempted_course():
     add_course("COSC-3506")
     add_student(
         history=[
-            {"course_code": "COSC-3506", "term": "24W", "credits_earned": 0, "status": "Attempted"}
+            {
+                "course_code": "COSC-3506",
+                "term": "24W",
+                "credits_earned": 0,
+                "status": "Attempted",
+            }
         ],
-        plan=[
-            {"course_code": "ITEC-3506", "term": "24F"}
-        ],
+        plan=[{"course_code": "ITEC-3506", "term": "24F"}],
     )
 
     report = get_report()
@@ -221,8 +246,18 @@ def test_retake_completed_course_counts_once_later_pass_overrides_failure():
     add_course("COSC-2006")
     add_student(
         history=[
-            {"course_code": "COSC-2006", "term": "23F", "credits_earned": 0, "status": "Attempted"},
-            {"course_code": "COSC-2006", "term": "24W", "credits_earned": 3, "status": "Completed"},
+            {
+                "course_code": "COSC-2006",
+                "term": "23F",
+                "credits_earned": 0,
+                "status": "Attempted",
+            },
+            {
+                "course_code": "COSC-2006",
+                "term": "24W",
+                "credits_earned": 3,
+                "status": "Completed",
+            },
         ],
         plan=[],
     )
@@ -237,8 +272,18 @@ def test_duplicate_completed_course_counts_once():
     add_course("COSC-2006")
     add_student(
         history=[
-            {"course_code": "COSC-2006", "term": "23F", "credits_earned": 3, "status": "Completed"},
-            {"course_code": "COSC 2006", "term": "24W", "credits_earned": 3, "status": "Completed"},
+            {
+                "course_code": "COSC-2006",
+                "term": "23F",
+                "credits_earned": 3,
+                "status": "Completed",
+            },
+            {
+                "course_code": "COSC 2006",
+                "term": "24W",
+                "credits_earned": 3,
+                "status": "Completed",
+            },
         ],
         plan=[],
     )
@@ -253,8 +298,18 @@ def test_non_completed_courses_do_not_count_for_credits():
     add_course("COSC-2006")
     add_student(
         history=[
-            {"course_code": "COSC-2006", "term": "23F", "credits_earned": 3, "status": "In-Progress"},
-            {"course_code": "MATH-1006", "term": "23F", "credits_earned": 3, "status": "Attempted"},
+            {
+                "course_code": "COSC-2006",
+                "term": "23F",
+                "credits_earned": 3,
+                "status": "In-Progress",
+            },
+            {
+                "course_code": "MATH-1006",
+                "term": "23F",
+                "credits_earned": 3,
+                "status": "Attempted",
+            },
         ],
         plan=[],
     )
@@ -270,18 +325,18 @@ def test_remaining_credit_never_negative():
     history = []
 
     for i in range(40):
-        history.append({
-            "course_code": f"DONE-{i}",
-            "term": "23F",
-            "credits_earned": 3,
-            "status": "Completed",
-        })
+        history.append(
+            {
+                "course_code": f"DONE-{i}",
+                "term": "23F",
+                "credits_earned": 3,
+                "status": "Completed",
+            }
+        )
 
     add_student(
         history=history,
-        plan=[
-            {"course_code": "COSC-4000", "term": "24F"}
-        ],
+        plan=[{"course_code": "COSC-4000", "term": "24F"}],
     )
 
     report = get_report()
