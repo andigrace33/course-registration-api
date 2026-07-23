@@ -1,22 +1,63 @@
-# AI Interaction Log: Since phase 1, I have learned a little bit of python so I asked ChatGPT to walk me through
-# step by step how to turn the phase 2 code into the phase 3 requirements. I learned about python
-# dictionaries, how to make comments with #, remove spaces and hyphens and make uppercase,
-# I learned about python lists. I relied on ChatGPT to cover the edge cases involving prerequisites,
-# courses taken multiple times etc. ChatGPT also showed me how to execute commands in the Terminal,
-# and also how to use uvicorn, and how to complete the github actions checks portion as I have not done this before
-
-from fastapi import FastAPI, UploadFile, File, HTTPException, status
+# AI Interaction Log: I have been watching a tutorial on youtube that covers FastAPI and python: https://youtu.be/iukOehU5aF4?si=JvjnOCMSNZ1oy5x8
+# During phase 4 I learned more about bcrypt, jwt, and pydantic. 
+#I used chatGPT to walk me through what code to put in order to implement the APIs. 
+# I looked at what chatGPT sent and then I would go into the documentation here to learn about what is actually happening. 
+# JWT: https://pyjwt.readthedocs.io/en/stable/, BCRYPT: https://github.com/pyca/bcrypt/blob/main/README.rst?plain=1, PYDANTIC: https://pydantic.dev/docs/validation/latest/get-started/. 
+# I used chatGPT to format the code with the proper spacing and indents and I used it to write functions. 
+# I also used chatGPT to make sure all of the edge cases were handled in the code. 
+import os
+import re
+import jwt
+import bcrypt
+import time
+from fastapi import (
+    FastAPI,
+    UploadFile,
+    File,
+    HTTPException,
+    status,
+    Header,
+    Depends,
+    Request,
+)
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
-import re
+from datetime import datetime, timedelta, timezone
+
 
 app = FastAPI()
 
 courses = {}
 students = {}
+users = {}
+rate_limits = {}
 
-# term and year dictionary
+#bcrypt
+users["admin"] = {
+    "password_hash": bcrypt.hashpw(
+        "admin".encode("utf-8"),
+        bcrypt.gensalt()
+    ),
+    "role": "admin"
+}
+
+#for password 
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+    "phase-4-development-secret-key",
+)
+ALGORITHM = "HS256"
+ACCESS_TOKEN_MINUTES = 60
+
+
+# dict for semester order
 season_order = {"W": 1, "SP": 2, "S": 3, "F": 4}
+
+# pydantic BaseModel inherited classes  
+
+class AuthRequest(BaseModel):
+    username: str
+    password: str
 
 
 class HistoryItem(BaseModel):
@@ -53,7 +94,7 @@ def yearSeasonSeparator(yearSeason):
     return (year, season)
 
 
-# function to determine the earlier term of 2 terms
+# function to return bool for the earlier term of 2 terms
 def isTermEarlier(yearSeason1, yearSeason2):
 
     year1, season1 = yearSeasonSeparator(yearSeason1)
@@ -198,7 +239,6 @@ def parse_table_transcript(soup):
 
     return records
 
-
 def parse_ellucian_bubbles(soup):
     records = []
 
@@ -254,6 +294,140 @@ def parse_history_html(html_content):
 def require_student(student_id: str):
     if student_id not in students:
         raise HTTPException(status_code=404, detail="Student not found")
+
+
+def create_access_token(username: str, role: str) -> str:
+    expiration = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MINUTES)
+    payload = {"sub": username, "role": role, "exp": expiration}
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_access_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    if not payload.get("sub") or not payload.get("role"):
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    return payload
+
+
+def get_current_user(authorization: str | None = Header(default=None)) -> dict:
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization token required")
+
+    scheme, separator, token = authorization.partition(" ")
+    if not separator or scheme.lower() != "bearer" or not token.strip():
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    return decode_access_token(token.strip())
+
+
+def require_owner(student_id: str, current_user: dict) -> None:
+    if current_user["sub"] != student_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def require_owner_or_admin(student_id: str, current_user: dict) -> None:
+    is_owner = current_user["sub"] == student_id
+    is_admin = current_user.get("role") == "admin"
+    if not is_owner and not is_admin:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def rate_limit_identifier(request: Request, authorization: str | None) -> str:
+    if authorization:
+        scheme, separator, token = authorization.partition(" ")
+        if separator and scheme.lower() == "bearer" and token.strip():
+            payload = decode_access_token(token.strip())
+            return "user:" + payload["sub"]
+
+    client_ip = request.client.host if request.client else "unknown"
+    return "ip:" + client_ip
+
+
+def enforce_audit_rate_limit(identifier: str) -> None:
+    now = time.time()
+    recent_requests = [
+        timestamp
+        for timestamp in rate_limits.get(identifier, [])
+        if now - timestamp < 60
+    ]
+
+    if len(recent_requests) >= 10:
+        rate_limits[identifier] = recent_requests
+        raise HTTPException(status_code=429, detail="Too many requests")
+
+    recent_requests.append(now)
+    rate_limits[identifier] = recent_requests
+
+
+def next_recommendation_term(term: str) -> str:
+    year = int(term[:2])
+    season = term[2:].upper()
+
+    if season == "F":
+        return f"{year + 1:02d}W"
+    return f"{year:02d}F"
+
+
+def build_recommended_pathway(student_id: str) -> list[dict]:
+    history = students[student_id]["history"]
+    completed = {
+        normalize(item["course_code"])
+        for item in history
+        if item["status"] == "Completed"
+    }
+
+    remaining = {key for key in courses if key not in completed}
+    adjacency = {key: [] for key in remaining}
+    indegree = {key: 0 for key in remaining}
+
+    for course_key in remaining:
+        prerequisites = split_course_list(courses[course_key]["prerequisites"])
+
+        for prerequisite in prerequisites:
+            prerequisite_key = normalize(prerequisite)
+
+            if prerequisite_key in completed:
+                continue
+
+            if prerequisite_key in remaining:
+                adjacency[prerequisite_key].append(course_key)
+                indegree[course_key] += 1
+
+    available = sorted(key for key, degree in indegree.items() if degree == 0)
+    pathway = []
+    scheduled_count = 0
+    term = "26F"
+
+    while available:
+        current_level = available
+        current_courses = [courses[key]["course_code"] for key in current_level]
+        pathway.append({"term": term, "courses": current_courses})
+        scheduled_count += len(current_level)
+
+        next_available = []
+        for course_key in current_level:
+            for dependent in adjacency[course_key]:
+                indegree[dependent] -= 1
+                if indegree[dependent] == 0:
+                    next_available.append(dependent)
+
+        available = sorted(next_available)
+        term = next_recommendation_term(term)
+
+    if scheduled_count != len(remaining):
+        raise HTTPException(
+            status_code=400,
+            detail="Catalog prerequisites contain a cycle or unresolved dependency",
+        )
+
+    return pathway
 
 
 def term_value(term: str):
@@ -409,7 +583,6 @@ def get_credit_summary(student_id: str):
 
 @app.post("/api/v1/admin/catalog/import")
 async def import_catalog(file: UploadFile = File(...)):
-
     content = await file.read()
     soup = BeautifulSoup(content, "html.parser")
 
@@ -417,8 +590,8 @@ async def import_catalog(file: UploadFile = File(...)):
     if not table:
         return {"message": "No table found"}
 
-    rows = table.find("tbody").find_all("tr")
-
+    tbody = table.find("tbody")
+    rows = tbody.find_all("tr") if tbody else table.find_all("tr")[1:]
     count = 0
 
     for row in rows:
@@ -431,9 +604,7 @@ async def import_catalog(file: UploadFile = File(...)):
         credits_text = cols[2].get_text(strip=True)
         prerequisites = cols[3].get_text(strip=True)
         cross_listed = cols[4].get_text(strip=True)
-
         credits = int(credits_text) if credits_text.isdigit() else 0
-
         key = normalize(course_code)
 
         courses[key] = {
@@ -443,7 +614,6 @@ async def import_catalog(file: UploadFile = File(...)):
             "prerequisites": prerequisites,
             "cross_listed": cross_listed,
         }
-
         count += 1
 
     return {"message": "Catalog imported", "courses_loaded": count}
@@ -451,26 +621,30 @@ async def import_catalog(file: UploadFile = File(...)):
 
 @app.get("/api/v1/catalog/courses/{course_code}")
 def get_course(course_code: str):
-
     key = normalize(course_code)
-
     if key not in courses:
         raise HTTPException(status_code=404, detail="Course not found")
-
     return courses[key]
 
 
-# phase 2 API
+# phase 2 and phase 4 protected student APIs
 
 
 @app.post(
-    "/api/v1/students/{student_id}/history/import", status_code=status.HTTP_201_CREATED
+    "/api/v1/students/{student_id}/history/import",
+    status_code=status.HTTP_201_CREATED,
 )
-async def import_history(student_id: str, file: UploadFile = File(...)):
+async def import_history(
+    student_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    require_owner(student_id, current_user)
     content = await file.read()
     history = parse_history_html(content)
 
-    students[student_id] = {"history": history, "plan": []}
+    existing_plan = students.get(student_id, {}).get("plan", [])
+    students[student_id] = {"history": history, "plan": existing_plan}
 
     return {"status": "success", "past_courses_imported": len(history)}
 
@@ -478,52 +652,45 @@ async def import_history(student_id: str, file: UploadFile = File(...)):
 @app.put("/api/v1/students/{student_id}/history")
 def update_history(student_id: str, body: HistoryBody):
     require_student(student_id)
-
     students[student_id]["history"] = [item.model_dump() for item in body.history]
-
     return {"status": "success", "message": "Academic history updated successfully"}
 
 
 @app.delete("/api/v1/students/{student_id}/history")
 def delete_history(student_id: str):
     require_student(student_id)
-
     students[student_id]["history"] = []
-
     return {"status": "success", "message": "Academic history cleared successfully"}
 
 
 @app.post("/api/v1/students/{student_id}/plan")
 def create_plan(student_id: str, body: PlanBody):
     require_student(student_id)
-
     students[student_id]["plan"] = [item.model_dump() for item in body.planned_courses]
-
     return {"status": "success", "planned_courses_saved": len(body.planned_courses)}
 
 
 @app.put("/api/v1/students/{student_id}/plan")
 def update_plan(student_id: str, body: PlanBody):
     require_student(student_id)
-
     students[student_id]["plan"] = [item.model_dump() for item in body.planned_courses]
-
     return {"status": "success", "planned_courses_saved": len(body.planned_courses)}
 
 
 @app.delete("/api/v1/students/{student_id}/plan")
 def delete_plan(student_id: str):
     require_student(student_id)
-
     students[student_id]["plan"] = []
-
     return {"status": "success", "message": "Plan cleared successfully"}
 
 
 @app.get("/api/v1/students/{student_id}/profile")
-def get_profile(student_id: str):
+def get_profile(
+    student_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    require_owner_or_admin(student_id, current_user)
     require_student(student_id)
-
     return {
         "student_id": student_id,
         "history": students[student_id]["history"],
@@ -531,14 +698,33 @@ def get_profile(student_id: str):
     }
 
 
+@app.get("/api/v1/students/{student_id}/plan")
+def get_plan(
+    student_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    require_owner_or_admin(student_id, current_user)
+    require_student(student_id)
+    return {
+        "student_id": student_id,
+        "planned_courses": students[student_id]["plan"],
+    }
+
+
 @app.get("/api/v1/students/{student_id}/audit-report")
-def audit_report(student_id: str, strict: bool = False):
+def audit_report(
+    student_id: str,
+    request: Request,
+    strict: bool = False,
+    authorization: str | None = Header(default=None),
+):
+    identifier = rate_limit_identifier(request, authorization)
+    enforce_audit_rate_limit(identifier)
     require_student(student_id)
 
     timeline_validation = check_prerequisites(student_id)
     cross_list_violations = check_cross_lists(student_id)
     credit_summary = get_credit_summary(student_id)
-
     has_issues = bool(timeline_validation) or bool(cross_list_violations)
 
     if has_issues and strict:
@@ -554,4 +740,57 @@ def audit_report(student_id: str, strict: bool = False):
         "timeline_validation": timeline_validation,
         "cross_list_violations": cross_list_violations,
         "credit_summary": credit_summary,
+    }
+
+
+# phase 4 authentication
+
+
+@app.post("/api/v1/auth/register", status_code=status.HTTP_201_CREATED)
+def register_user(auth: AuthRequest):
+    username = auth.username.strip()
+
+    if not username or not auth.password:
+        raise HTTPException(status_code=400, detail="Username and password are required")
+
+    if username in users:
+        raise HTTPException(status_code=409, detail="Username already exists")
+
+    password_hash = bcrypt.hashpw(
+        auth.password.encode("utf-8"),
+        bcrypt.gensalt(),
+    )
+    users[username] = {"password_hash": password_hash, "role": "student"}
+    return {"status": "registered"}
+
+
+@app.post("/api/v1/auth/login")
+def login_user(auth: AuthRequest):
+    username = auth.username.strip()
+    user = users.get(username)
+
+    if user is None or not bcrypt.checkpw(
+        auth.password.encode("utf-8"),
+        user["password_hash"],
+    ):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    access_token = create_access_token(username, user["role"])
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+# phase 4 recommendations
+
+
+@app.get("/api/v1/students/{student_id}/recommendations")
+def get_recommendations(
+    student_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    require_owner_or_admin(student_id, current_user)
+    require_student(student_id)
+
+    return {
+        "student_id": student_id,
+        "recommended_pathway": build_recommended_pathway(student_id),
     }
