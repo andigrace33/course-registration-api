@@ -4,7 +4,8 @@
 # I looked at what chatGPT sent and then I would go into the documentation here to learn about what is actually happening. 
 # JWT: https://pyjwt.readthedocs.io/en/stable/, BCRYPT: https://github.com/pyca/bcrypt/blob/main/README.rst?plain=1, PYDANTIC: https://pydantic.dev/docs/validation/latest/get-started/. 
 # I used chatGPT to format the code with the proper spacing and indents and I used it to write functions. 
-# I also used chatGPT to make sure all of the edge cases were handled in the code. 
+# I also used chatGPT to make sure all of the edge cases were handled in the code.
+
 import os
 import re
 import jwt
