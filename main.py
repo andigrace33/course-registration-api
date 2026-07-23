@@ -1,9 +1,9 @@
 # AI Interaction Log: I have been watching a tutorial on youtube that covers FastAPI and python: https://youtu.be/iukOehU5aF4?si=JvjnOCMSNZ1oy5x8
-# During phase 4 I learned more about bcrypt, jwt, and pydantic. 
-#I used chatGPT to walk me through what code to put in order to implement the APIs. 
-# I looked at what chatGPT sent and then I would go into the documentation here to learn about what is actually happening. 
-# JWT: https://pyjwt.readthedocs.io/en/stable/, BCRYPT: https://github.com/pyca/bcrypt/blob/main/README.rst?plain=1, PYDANTIC: https://pydantic.dev/docs/validation/latest/get-started/. 
-# I used chatGPT to format the code with the proper spacing and indents and I used it to write functions. 
+# During phase 4 I learned more about bcrypt, jwt, and pydantic.
+# I used chatGPT to walk me through what code to put in order to implement the APIs.
+# I looked at what chatGPT sent and then I would go into the documentation here to learn about what is actually happening.
+# JWT: https://pyjwt.readthedocs.io/en/stable/, BCRYPT: https://github.com/pyca/bcrypt/blob/main/README.rst?plain=1, PYDANTIC: https://pydantic.dev/docs/validation/latest/get-started/.
+# I used chatGPT to format the code with the proper spacing and indents and I used it to write functions.
 # I also used chatGPT to make sure all of the edge cases were handled in the code.
 
 import os
@@ -25,7 +25,6 @@ from pydantic import BaseModel
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta, timezone
 
-
 app = FastAPI()
 
 courses = {}
@@ -33,16 +32,13 @@ students = {}
 users = {}
 rate_limits = {}
 
-#bcrypt
+# bcrypt
 users["admin"] = {
-    "password_hash": bcrypt.hashpw(
-        "admin".encode("utf-8"),
-        bcrypt.gensalt()
-    ),
-    "role": "admin"
+    "password_hash": bcrypt.hashpw("admin".encode("utf-8"), bcrypt.gensalt()),
+    "role": "admin",
 }
 
-#for password 
+# for password
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
     "phase-4-development-secret-key",
@@ -54,7 +50,8 @@ ACCESS_TOKEN_MINUTES = 60
 # dict for semester order
 season_order = {"W": 1, "SP": 2, "S": 3, "F": 4}
 
-# pydantic BaseModel inherited classes  
+# pydantic BaseModel inherited classes
+
 
 class AuthRequest(BaseModel):
     username: str
@@ -239,6 +236,7 @@ def parse_table_transcript(soup):
             )
 
     return records
+
 
 def parse_ellucian_bubbles(soup):
     records = []
@@ -752,7 +750,9 @@ def register_user(auth: AuthRequest):
     username = auth.username.strip()
 
     if not username or not auth.password:
-        raise HTTPException(status_code=400, detail="Username and password are required")
+        raise HTTPException(
+            status_code=400, detail="Username and password are required"
+        )
 
     if username in users:
         raise HTTPException(status_code=409, detail="Username already exists")
