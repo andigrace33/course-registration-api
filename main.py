@@ -1,10 +1,26 @@
-# AI Interaction Log: I have been watching a tutorial on youtube that covers FastAPI and python: https://youtu.be/iukOehU5aF4?si=JvjnOCMSNZ1oy5x8
-# During phase 4 I learned more about bcrypt, jwt, and pydantic.
-# I used chatGPT to walk me through what code to put in order to implement the APIs.
-# I looked at what chatGPT sent and then I would go into the documentation here to learn about what is actually happening.
-# JWT: https://pyjwt.readthedocs.io/en/stable/, BCRYPT: https://github.com/pyca/bcrypt/blob/main/README.rst?plain=1, PYDANTIC: https://pydantic.dev/docs/validation/latest/get-started/.
-# I used chatGPT to format the code with the proper spacing and indents and I used it to write functions.
-# I also used chatGPT to make sure all of the edge cases were handled in the code.
+# AI Interaction Log: I have been watching a tutorial on YouTube that covers
+# FastAPI and Python:
+# https://youtu.be/iukOehU5aF4?si=JvjnOCMSNZ1oy5x8
+#
+# During Phase 4 I learned more about bcrypt, jwt, and pydantic.
+# I used ChatGPT to walk me through what code to put in order to implement
+# the APIs.
+# I looked at what ChatGPT sent and then I would go into the documentation
+# here to learn about what is actually happening.
+#
+# JWT:
+# https://pyjwt.readthedocs.io/en/stable/
+#
+# BCRYPT:
+# https://github.com/pyca/bcrypt/blob/main/README.rst?plain=1
+#
+# PYDANTIC:
+# https://pydantic.dev/docs/validation/latest/get-started/
+#
+# I used ChatGPT to format the code with the proper spacing and indents and
+# I used it to write functions.
+# I also used ChatGPT to make sure all of the edge cases were handled in the
+# code.
 
 import os
 import re
